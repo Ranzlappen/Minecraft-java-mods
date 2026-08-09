@@ -1,0 +1,100 @@
+# =============================================================================
+# .gitignore for a Minecraft mod repo.
+#
+# Sections are ordered by how expensive a mistake is. Secrets first so they are
+# never lost while pruning the rest.
+# =============================================================================
+
+
+# === Secrets =================================================================
+# Publishing tokens belong in GitHub Actions secrets and in your shell, never
+# in the repo. See docs/09-publishing.md
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+**/secrets.properties
+
+
+# === Gradle ==================================================================
+# gradle-wrapper.jar IS committed — that is what makes ./gradlew work on a
+# fresh clone. The negation below protects it from the blanket *.jar rule.
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Machine-specific paths (SDK locations, etc.).
+local.properties
+
+
+# === Minecraft dev runtime ===================================================
+# Everything the dev client and dev server write. Worlds, logs, configs,
+# crash reports, and the mod's own generated config — all disposable, all
+# machine-specific, and worlds get large fast.
+run/
+*/run/
+runs/
+*/runs/
+
+# Loom and ModDevGradle scratch space.
+.architectury-transformer/
+*/.architectury-transformer/
+.minecraft/
+
+
+# === Generated resources =====================================================
+# NOTE: src/generated/resources IS committed on purpose.
+#
+# Datagen output (recipes, tags, loot tables, models) is a build *input* for
+# anyone who has not run datagen, and committing it makes the diff of a recipe
+# change reviewable. Re-generate with ./gradlew :neoforge:runData
+#
+# The cache file is the exception — it is a local timestamp index.
+src/generated/resources/.cache/
+*/src/generated/resources/.cache/
+
+
+# === Java / JVM ==============================================================
+*.class
+hs_err_pid*
+replay_pid*
+*.hprof
+
+
+# === IDEs ====================================================================
+# .idea/ is ignored wholesale rather than cherry-picked: the modding toolchain
+# regenerates run configurations on every Gradle sync, so committing them
+# produces constant noise.
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+.classpath
+.project
+.settings/
+bin/
+.eclipse/
+
+
+# === OS noise ================================================================
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+
+
+# === Misc ====================================================================
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej

@@ -1,0 +1,164 @@
+// =============================================================================
+// build.gradle (root) — configuration shared by common/, fabric/ and neoforge/.
+// =============================================================================
+//
+// The root project itself produces no jar. Its job is to apply the settings
+// that would otherwise be copy-pasted into all three subprojects: Java
+// toolchain, encoding, repositories, resource expansion, and jar metadata.
+//
+// Keep loader-specific logic OUT of this file. If something only applies to
+// Fabric, it belongs in fabric/build.gradle.
+// =============================================================================
+
+plugins {
+    // `apply false` = make the plugin available to subprojects without applying
+    // it here. The root project is not a mod, so it must not get modding plugins.
+    id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+    id 'net.neoforged.moddev' version "${moddev_version}" apply false
+    id 'me.modmuss50.mod-publish-plugin' version '2.2.0' apply false
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'maven-publish'
+
+    // ---- Coordinates --------------------------------------------------------
+    // Every jar is named <mod_id>-<loader>-<mod_version>+mc<minecraft_version>,
+    // e.g. examplemod-fabric-0.1.0+mc26.2.jar. Encoding the Minecraft version in
+    // the filename is not cosmetic: users routinely have several versions of the
+    // same mod in a downloads folder and the loader gives a very unhelpful error
+    // when the wrong one is dropped into mods/.
+    version = "${mod_version}+mc${minecraft_version}"
+    group = mod_group_id
+    base.archivesName = "${mod_id}-${project.name}"
+
+    // ---- Java toolchain -----------------------------------------------------
+    java {
+        toolchain {
+            // Gradle downloads this JDK if you do not have it (see the foojay
+            // plugin in settings.gradle). Contributors do not need Java 25
+            // installed system-wide.
+            languageVersion = JavaLanguageVersion.of(java_version as int)
+        }
+        withSourcesJar()
+        // A javadoc jar is cheap to produce and is what other modders consume
+        // when they depend on your mod as a library.
+        withJavadocJar()
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        // `release` is stricter than sourceCompatibility: it also checks that you
+        // are not calling APIs newer than the target, which catches accidental
+        // use of a JDK method Minecraft's runtime will not have.
+        options.release = java_version as int
+        // Mixin and several Minecraft APIs rely on real parameter names at
+        // runtime. Without -parameters they are erased to arg0, arg1, ...
+        options.compilerArgs << '-parameters'
+    }
+
+    tasks.withType(Javadoc).configureEach {
+        options.encoding = 'UTF-8'
+        // Minecraft's own javadoc is incomplete; failing the build on every
+        // missing @param would make `build` unusable.
+        options.addStringOption('Xdoclint:none', '-quiet')
+    }
+
+    // Reproducible builds: identical sources produce a byte-identical jar.
+    // Without this, timestamps embedded in zip entries change every run, which
+    // breaks build caching and makes it impossible to verify a published jar
+    // matches its source tag.
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+
+    repositories {
+        mavenCentral()
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases'
+        }
+        // Common third-party mod mavens, commented out until you need them.
+        // Uncomment only what you use — every extra repository slows resolution.
+        //
+        // maven { name = 'Modrinth'; url = 'https://api.modrinth.com/maven'
+        //         content { includeGroup 'maven.modrinth' } }
+        // maven { name = 'CurseMaven'; url = 'https://cursemaven.com'
+        //         content { includeGroup 'curse.maven' } }
+        // maven { name = 'JEI'; url = 'https://maven.blamejared.com/' }
+    }
+
+    // ---- Resource templating ------------------------------------------------
+    // Every value below is substituted into fabric.mod.json and
+    // neoforge.mods.toml at build time. This is why you never hand-edit a
+    // version number in a metadata file: change gradle.properties, rebuild.
+    processResources {
+        def expansions = [
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_version            : mod_version,
+            mod_group_id           : mod_group_id,
+            mod_author             : mod_author,
+            mod_license            : mod_license,
+            mod_description        : mod_description,
+            mod_homepage           : mod_homepage,
+            mod_sources            : mod_sources,
+            mod_issues             : mod_issues,
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            fabric_minecraft_version_range: fabric_minecraft_version_range,
+            java_version           : java_version,
+            loader_version         : loader_version,
+            fabric_api_version     : fabric_api_version,
+            neoforge_version       : neoforge_version,
+        ]
+
+        inputs.properties expansions
+
+        filesMatching(['fabric.mod.json', 'META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
+            expand expansions
+        }
+    }
+
+    jar {
+        // Ship the licence inside the jar. Renamed so that merging jars (JiJ)
+        // does not silently overwrite someone else's LICENSE entry.
+        from(rootProject.file('LICENSE')) {
+            rename { "${it}_${mod_id}" }
+        }
+
+        manifest {
+            attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_author,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : mod_name,
+                'Implementation-Version'  : project.version,
+                'Implementation-Vendor'   : mod_author,
+                'Built-On-Minecraft'      : minecraft_version,
+            ])
+        }
+    }
+
+    publishing {
+        publications {
+            register('mavenJava', MavenPublication) {
+                from components.java
+            }
+        }
+        repositories {
+            // Publishes to build/repo by default so `./gradlew publish` is safe
+            // to run locally without credentials. Point this at a real maven
+            // when you want other modders to depend on your mod.
+            maven {
+                name = 'projectLocal'
+                url = rootProject.layout.buildDirectory.dir('repo')
+            }
+        }
+    }
+}

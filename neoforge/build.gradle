@@ -1,0 +1,109 @@
+// =============================================================================
+// neoforge/build.gradle — the NeoForge jar.
+// =============================================================================
+//
+// Unlike the Fabric subproject, NeoForge has no equivalent of
+// splitEnvironmentSourceSets(): there is one source set and client-only classes
+// are guarded at *runtime* instead, via `@Mod(dist = Dist.CLIENT)` and by never
+// referencing a client class from common code.
+//
+// That difference is the main reason the sides documentation is worth reading
+// before writing anything: docs/02-sides-client-vs-server.md
+// =============================================================================
+
+plugins {
+    id 'net.neoforged.moddev'
+    id 'me.modmuss50.mod-publish-plugin'
+}
+
+// Share common/'s sources — same rationale as fabric/build.gradle.
+sourceSets {
+    main {
+        java.srcDir project(':common').file('src/main/java')
+        resources.srcDir project(':common').file('src/main/resources')
+    }
+}
+
+neoForge {
+    version = neoforge_version
+
+    // Catches typos and stale entries in accesstransformer.cfg at build time
+    // rather than as a silent no-op that fails much later in the game.
+    validateAccessTransformers = true
+
+    runs {
+        client {
+            client()
+            gameDirectory = project.file('run/client')
+        }
+        server {
+            server()
+            gameDirectory = project.file('run/server')
+        }
+        // Data generation: writes recipes, tags, loot tables and models into
+        // src/generated/resources. Run it after changing any datagen provider.
+        // `clientData()` is used because most providers need client-side
+        // asset context (models, lang) even when the mod is server-focused.
+        data {
+            clientData()
+            gameDirectory = project.file('run/data')
+            programArguments.addAll(
+                '--mod', mod_id,
+                '--all',
+                '--output', project.file('src/generated/resources').absolutePath,
+                '--existing', project.file('src/main/resources').absolutePath
+            )
+        }
+    }
+
+    mods {
+        register(mod_id) {
+            sourceSet sourceSets.main
+        }
+    }
+
+    unitTest {
+        enable()
+        testedMod = mods.named(mod_id)
+    }
+}
+
+// Generated resources are real resources — they must end up in the jar.
+sourceSets.main.resources.srcDir 'src/generated/resources'
+
+dependencies {
+    compileOnly "org.jetbrains:annotations:26.0.2"
+
+    testImplementation platform("org.junit:junit-bom:5.14.1")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+publishMods {
+    file = jar.archiveFile
+    displayName = "${mod_name} ${mod_version} (NeoForge ${minecraft_version})"
+    version = project.version
+    changelog = providers.environmentVariable('CHANGELOG_BODY').getOrElse('See the GitHub release notes.')
+    type = providers.environmentVariable('RELEASE_CHANNEL').getOrElse('stable')
+    modLoaders.add('neoforge')
+
+    if (modrinth_id) {
+        modrinth {
+            projectId = modrinth_id
+            accessToken = providers.environmentVariable('MODRINTH_TOKEN')
+            minecraftVersions.addAll(publish_game_versions.split(',').collect { it.trim() })
+        }
+    }
+
+    if (curseforge_id) {
+        curseforge {
+            projectId = curseforge_id
+            accessToken = providers.environmentVariable('CURSEFORGE_TOKEN')
+            minecraftVersions.addAll(publish_game_versions.split(',').collect { it.trim() })
+        }
+    }
+}

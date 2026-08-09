@@ -1,0 +1,23 @@
+# Normalise line endings so a Windows contributor does not produce a diff that
+# touches every line of every file.
+* text=auto eol=lf
+
+# gradlew is executed by /bin/sh; CRLF makes it fail with a confusing
+# "bad interpreter" error on Linux and macOS.
+gradlew        text eol=lf
+*.sh           text eol=lf
+
+# The Windows batch wrapper genuinely needs CRLF.
+gradlew.bat    text eol=crlf
+*.bat          text eol=crlf
+
+# Binary — never touch these.
+*.jar          binary
+*.png          binary
+*.ogg          binary
+*.zip          binary
+*.nbt          binary
+
+# Keep generated datagen output out of the "lines changed" statistics; it is
+# machine-written and reviewing it line by line is not useful.
+src/generated/resources/** linguist-generated=true

@@ -1,0 +1,54 @@
+// =============================================================================
+// settings.gradle — which subprojects exist, and where plugins come from.
+// =============================================================================
+//
+// Three subprojects, in dependency order:
+//
+//   common/    Loader-agnostic mod logic. Compiled against plain Minecraft via
+//              NeoForm. Knows nothing about Fabric or NeoForge. This is where
+//              the majority of your code should live.
+//
+//   fabric/    Fabric entrypoints + Fabric-specific implementations. Depends on
+//              common. Produces the Fabric jar.
+//
+//   neoforge/  NeoForge entrypoints + NeoForge-specific implementations.
+//              Depends on common. Produces the NeoForge jar.
+//
+// Dropping a loader: delete its folder and remove its include() line below.
+// Everything else keeps working — see docs/01-architecture.md#dropping-a-loader
+// =============================================================================
+
+pluginManagement {
+    repositories {
+        // Fabric Loom lives here.
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+            content { includeGroupByRegex 'net\\.fabricmc.*' }
+        }
+        // ModDevGradle and everything else NeoForged publishes lives here.
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases'
+            content { includeGroupByRegex 'net\\.neoforged.*' }
+        }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+plugins {
+    // Lets Gradle download the exact JDK the build asks for (Java 25 here)
+    // instead of failing when your local JAVA_HOME is a different major.
+    // This is why contributors do not need to install Java 25 by hand.
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+// Read from gradle.properties so mod_id is defined in exactly one place.
+// Properties in the root gradle.properties are available on the Settings
+// object, which is why this works before any project is evaluated.
+rootProject.name = mod_id
+
+include 'common'
+include 'fabric'
+include 'neoforge'

@@ -1,0 +1,51 @@
+# Dependabot configuration.
+#
+# IMPORTANT: Dependabot cannot see the versions that matter most here.
+# Minecraft, Fabric API, Fabric Loom, NeoForge, NeoForm and ModDevGradle are
+# plain strings in gradle.properties, not coordinates in a dependency block, so
+# no dependency bot resolves them. Those are handled by
+# .github/workflows/toolchain-watch.yml, which opens a tracking issue instead.
+#
+# What Dependabot does cover here: GitHub Actions, and any ordinary Maven
+# dependency you add to a build script.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      # One PR for all action bumps rather than five. Actions are low-risk and
+      # reviewing them individually is pure overhead.
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # These are pinned deliberately to match the Minecraft version, and
+      # bumping them independently produces a build that does not run.
+      # toolchain-watch.yml tracks them properly.
+      - dependency-name: "net.fabricmc:fabric-loader"
+      - dependency-name: "net.fabricmc.fabric-api:fabric-api"
+      - dependency-name: "com.mojang:minecraft"
+      - dependency-name: "net.neoforged:neoforge"
