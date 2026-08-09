@@ -1,0 +1,93 @@
+name: Bug report
+description: Something does not work.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: check [docs/10-troubleshooting.md](https://github.com/Ranzlappen/Minecraft-java-mods/blob/main/docs/10-troubleshooting.md).
+        A large share of reports are one of the entries there.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start a dedicated server with only this mod
+        2. Join and run /playtime
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: mod-version
+    attributes:
+      label: Mod version
+      description: The full filename, e.g. examplemod-fabric-0.1.0+mc26.2.jar
+    validations:
+      required: true
+
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Loader
+      options: [Fabric, NeoForge]
+    validations:
+      required: true
+
+  - type: input
+    id: minecraft-version
+    attributes:
+      label: Minecraft version
+      placeholder: "26.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: side
+    attributes:
+      label: Where does it happen?
+      description: |
+        This matters more than it looks. A bug that only appears on a dedicated
+        server is usually a completely different cause from the same symptom in
+        singleplayer.
+      options:
+        - Dedicated server
+        - Singleplayer
+        - Multiplayer, on the client
+        - Both singleplayer and dedicated server
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client-installed
+    attributes:
+      label: Is the mod installed on the client too?
+      options: ["Yes", "No", "Not applicable (singleplayer)"]
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log or crash report
+      description: |
+        Paste the full log, or link a paste. `logs/latest.log`, or the file in
+        `crash-reports/`. Not a screenshot — we need to search the text.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: other-mods
+    attributes:
+      label: Other mods installed
+      description: If it only happens with another mod present, say which.

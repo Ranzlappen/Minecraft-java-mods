@@ -1,0 +1,135 @@
+// =============================================================================
+// fabric/build.gradle — the Fabric jar.
+// =============================================================================
+//
+// NOTE ON THE PLUGIN ID. There are two Loom plugins and picking the wrong one
+// produces a confusing wall of errors:
+//
+//   net.fabricmc.fabric-loom         Minecraft 26.1+  (unobfuscated)   <-- this template
+//   net.fabricmc.fabric-loom-remap   Minecraft 1.21.11 and older (obfuscated)
+//
+// With the remap plugin you must also declare `mappings` and use
+// `modImplementation`. With the plain plugin you must NOT declare mappings and
+// you use ordinary `implementation`. Mixing the two conventions is the single
+// most common build failure when porting across the 2026 boundary.
+// Side-by-side diff: docs/05-upgrading-minecraft-versions.md#the-2026-unobfuscation-cliff
+// =============================================================================
+
+plugins {
+    id 'net.fabricmc.fabric-loom'
+    id 'me.modmuss50.mod-publish-plugin'
+}
+
+// -----------------------------------------------------------------------------
+// Share common/'s sources into this project.
+//
+// We compile common's *source files* here rather than depending on common's
+// compiled jar. Reasons:
+//   - No cross-project classpath or publication leakage (nothing bogus in the POM).
+//   - Each loader compiles common against its own view of Minecraft, so a
+//     loader-specific incompatibility surfaces at compile time, not at runtime.
+//   - Mixins declared in common are processed by this loader's annotation
+//     processor, which is what makes them actually apply.
+//
+// The `common` subproject still builds on its own — that build is what proves
+// the shared code is genuinely loader-agnostic.
+// -----------------------------------------------------------------------------
+sourceSets {
+    main {
+        java.srcDir project(':common').file('src/main/java')
+        resources.srcDir project(':common').file('src/main/resources')
+    }
+}
+
+loom {
+    // Creates a second source set, `client`, that is compiled against the
+    // client-only half of Minecraft. Code in src/client/java physically cannot
+    // be reached by a dedicated server, so an accidental client call becomes a
+    // compile error instead of a NoClassDefFoundError on someone's server.
+    //
+    // This is the single most valuable safety net for a server-side mod.
+    // Explanation: docs/02-sides-client-vs-server.md#compile-time-enforcement
+    splitEnvironmentSourceSets()
+
+    mods {
+        register(mod_id) {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+
+    runs {
+        // `./gradlew :fabric:runClient` and `:fabric:runServer`.
+        // Both are pre-configured by Loom; we only adjust the run directories so
+        // the two do not fight over the same world files.
+        client {
+            client()
+            runDir 'run/client'
+        }
+        server {
+            server()
+            runDir 'run/server'
+            // A dedicated server refuses to start without an accepted EULA.
+            // This only touches the throwaway dev server under fabric/run/.
+            property 'fabric.dli.env', 'server'
+        }
+    }
+}
+
+dependencies {
+    // Loom resolves this to the real Minecraft jar. No `mappings` line: as of
+    // 26.1 Minecraft ships unobfuscated and there is nothing left to remap.
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    compileOnly "org.jetbrains:annotations:26.0.2"
+}
+
+// -----------------------------------------------------------------------------
+// Publishing to Modrinth / CurseForge / GitHub Releases.
+//
+// Every target is conditional on its ID being set in gradle.properties, so a
+// fresh clone of this template publishes nothing and fails nothing. Tokens come
+// from the environment and are never committed.
+// -----------------------------------------------------------------------------
+// Which task produces the distributable jar depends on whether Minecraft is
+// obfuscated. On obfuscated versions (<=1.21.11, the `-remap` plugin) Loom adds
+// a `remapJar` task and that is the artifact users install. On unobfuscated
+// versions there is nothing to remap, so plain `jar` is the deliverable and
+// `remapJar` may not exist at all.
+//
+// Resolving it by name keeps this build script working on both sides of the
+// 2026 boundary, which matters when you port back to an LTS branch.
+def distributionJar = tasks.names.contains('remapJar')
+        ? tasks.named('remapJar', Jar)
+        : tasks.named('jar', Jar)
+
+publishMods {
+    file = distributionJar.flatMap { it.archiveFile }
+    displayName = "${mod_name} ${mod_version} (Fabric ${minecraft_version})"
+    version = project.version
+    changelog = providers.environmentVariable('CHANGELOG_BODY').getOrElse('See the GitHub release notes.')
+    // alpha / beta / stable — release.yml sets this from the tag suffix.
+    type = providers.environmentVariable('RELEASE_CHANNEL').getOrElse('stable')
+    modLoaders.add('fabric')
+
+    if (modrinth_id) {
+        modrinth {
+            projectId = modrinth_id
+            accessToken = providers.environmentVariable('MODRINTH_TOKEN')
+            minecraftVersions.addAll(publish_game_versions.split(',').collect { it.trim() })
+            requires { slug = 'fabric-api' }
+        }
+    }
+
+    if (curseforge_id) {
+        curseforge {
+            projectId = curseforge_id
+            accessToken = providers.environmentVariable('CURSEFORGE_TOKEN')
+            minecraftVersions.addAll(publish_game_versions.split(',').collect { it.trim() })
+            requires { slug = 'fabric-api' }
+        }
+    }
+}

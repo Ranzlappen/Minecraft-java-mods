@@ -1,0 +1,215 @@
+# Continuous integration for every push and pull request.
+#
+# Four jobs, cheapest first, so a fast failure comes back fast:
+#
+#   metadata     ~10s   Mod metadata expands and parses. No Gradle.
+#   side-safety  ~5s    No client classes referenced from common code.
+#   build        ~5m    Both loaders compile; unit tests pass; jars uploaded.
+#   server-smoke ~6m    Both dedicated servers actually start and shut down.
+#
+# `server-smoke` is the one that matters most. Compiling proves very little
+# about a Minecraft mod: the classic failure is a client class reached from
+# server code, which compiles fine and crashes on somebody's server.
+
+name: Build
+
+on:
+  push:
+    branches: ["main", "mc/**"]
+  pull_request:
+    branches: ["main", "mc/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  metadata:
+    name: Mod metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: Validate metadata templates
+        run: python3 scripts/validate-metadata.py
+
+  # ---------------------------------------------------------------------------
+  side-safety:
+    name: Side safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      # common/ and fabric/src/main/java are loaded on dedicated servers, which
+      # do not have net.minecraft.client on the classpath at all. A single
+      # reference is a guaranteed NoClassDefFoundError for every server
+      # operator, and it compiles cleanly, so nothing else catches it.
+      #
+      # The checker strips comments before matching — javadoc that merely
+      # *mentions* net.minecraft.client is not a reference, and a plain grep
+      # produces false positives on precisely the files that document the rule.
+      #
+      # docs/02-sides-client-vs-server.md explains why this is worth a CI job.
+      - name: No client classes in server-safe code
+        run: python3 scripts/check-side-safety.py
+
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      # Read the JDK version out of gradle.properties rather than hard-coding
+      # it here. A Minecraft upgrade changes the required Java version, and a
+      # second place to update is a second place to forget.
+      - name: Resolve Java version from gradle.properties
+        id: java
+        run: |
+          JAVA_VERSION="$(grep -E '^java_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+          if [ -z "$JAVA_VERSION" ]; then
+            echo "::error::java_version missing from gradle.properties"
+            exit 1
+          fi
+          echo "version=$JAVA_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building with Java $JAVA_VERSION"
+
+      - name: Setup JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654  # v5
+        with:
+          distribution: 'temurin'
+          java-version: ${{ steps.java.outputs.version }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d  # v4
+        with:
+          # Only write the dependency cache from the default branch, so a PR
+          # cannot poison the cache other builds read.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Build all loaders
+        run: ./gradlew build --stacktrace
+
+      - name: Unit tests
+        run: ./gradlew :common:test :neoforge:test --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/'
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # Exclude the build intermediates users must never install.
+      - name: Upload mod jars
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: mod-jars
+          path: |
+            fabric/build/libs/*.jar
+            neoforge/build/libs/*.jar
+            !**/*-dev.jar
+            !**/*-sources.jar
+            !**/*-javadoc.jar
+          retention-days: 14
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  server-smoke:
+    name: Dedicated server smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        loader: [fabric, neoforge]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: Resolve Java version from gradle.properties
+        id: java
+        run: echo "version=$(grep -E '^java_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Setup JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654  # v5
+        with:
+          distribution: 'temurin'
+          java-version: ${{ steps.java.outputs.version }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d  # v4
+        with:
+          cache-read-only: true
+
+      - name: Accept EULA for the throwaway dev server
+        run: |
+          mkdir -p "${{ matrix.loader }}/run/server"
+          echo "eula=true" > "${{ matrix.loader }}/run/server/eula.txt"
+
+      # Start the server, give it time to load the mod and generate a world,
+      # then stop it. A crash during startup makes the wrapper exit non-zero.
+      - name: Boot dedicated server
+        run: |
+          set -o pipefail
+          timeout --signal=INT 15m \
+            ./gradlew ":${{ matrix.loader }}:runServer" --stacktrace 2>&1 \
+            | tee server-output.log || true
+
+      - name: Assert the server started cleanly
+        run: |
+          LOG="${{ matrix.loader }}/run/server/logs/latest.log"
+          if [ ! -f "$LOG" ]; then
+            echo "::error::No server log produced — the server never got far enough to log."
+            tail -n 100 server-output.log || true
+            exit 1
+          fi
+
+          echo "--- last 60 lines of the server log ---"
+          tail -n 60 "$LOG"
+
+          # 'Done (…)! For help, type "help"' is vanilla's ready marker.
+          if ! grep -qE 'Done \(.*\)! For help' "$LOG"; then
+            echo "::error::Server never reached the ready state."
+            exit 1
+          fi
+
+          # A mixin that fails to apply is often non-fatal but always a bug.
+          if grep -qiE 'mixin apply failed|critical injection failure' "$LOG"; then
+            echo "::error::Mixin failure in the server log."
+            grep -iE 'mixin apply failed|critical injection failure' "$LOG"
+            exit 1
+          fi
+
+          if grep -q 'NoClassDefFoundError' "$LOG"; then
+            echo "::error::NoClassDefFoundError on a dedicated server — likely a client class in common code."
+            grep -A5 'NoClassDefFoundError' "$LOG"
+            exit 1
+          fi
+
+          echo "OK: ${{ matrix.loader }} dedicated server started cleanly."
+
+      - name: Upload server log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: server-log-${{ matrix.loader }}
+          path: |
+            ${{ matrix.loader }}/run/server/logs/
+            ${{ matrix.loader }}/run/server/crash-reports/
+          retention-days: 7
+          if-no-files-found: ignore

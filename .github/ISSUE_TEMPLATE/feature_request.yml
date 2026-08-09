@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest something new.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation, not the solution you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: side
+    attributes:
+      label: Would this need a client-side install?
+      description: |
+        Anything involving new rendering, a GUI, or a keybind does.
+        See docs/02-sides-client-vs-server.md
+      options:
+        - "No — the server can do it with vanilla packets"
+        - "Yes — it needs new rendering or input"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have considered
+      description: Including other mods that already do this.

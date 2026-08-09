@@ -1,0 +1,90 @@
+# Weekly check for newer Minecraft / Fabric / NeoForge versions.
+#
+# Dependabot cannot help here: Minecraft, Fabric API and NeoForge versions live
+# in gradle.properties as plain strings, not as Maven coordinates in a
+# dependency block, so no dependency bot sees them.
+#
+# When something newer exists this opens (or updates) a single tracking issue.
+# It never edits the build — a Minecraft bump is a porting job, not a version
+# bump, and pretending otherwise produces a green PR that does not run.
+#
+# See docs/05-upgrading-minecraft-versions.md
+
+name: Toolchain watch
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check for updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: Check upstream versions
+        id: check
+        run: |
+          set +e
+          python3 scripts/check-toolchain-updates.py > report.md
+          echo "outdated=$?" >> "$GITHUB_OUTPUT"
+          set -e
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          cat report.md
+
+      - name: Open or update the tracking issue
+        if: steps.check.outputs.outdated == '1'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('report.md', 'utf8');
+            const title = 'Toolchain updates available';
+            const body = [
+              report,
+              '',
+              '---',
+              '',
+              'Opened automatically by `.github/workflows/toolchain-watch.yml`.',
+              'This issue is updated in place each week; it is not reopened once closed',
+              'unless something new appears.',
+            ].join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'toolchain',
+              per_page: 20,
+            });
+
+            const match = existing.data.find(issue => issue.title === title);
+
+            if (match) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body,
+              });
+              core.info(`Updated issue #${match.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['toolchain', 'dependencies'],
+              });
+              core.info(`Opened issue #${created.data.number}`);
+            }

@@ -1,0 +1,66 @@
+// =============================================================================
+// common/build.gradle — loader-agnostic code.
+// =============================================================================
+//
+// This subproject compiles against *plain Minecraft* and nothing else. It has
+// no access to Fabric API, no access to the NeoForge event bus, no access to
+// Mixin's loader-specific plumbing.
+//
+// That restriction is the whole point. If common compiles, the code in it is
+// provably portable between loaders. Anything that will not compile here is a
+// signal that it belongs behind the platform abstraction instead — see
+// docs/01-architecture.md#the-platform-abstraction
+//
+// Plain Minecraft is provided by NeoForm ("vanilla mode" in ModDevGradle).
+// NeoForm is just Minecraft, decompiled and source-mapped, with no loader
+// attached. Using it here does NOT make common depend on NeoForge at runtime.
+// =============================================================================
+
+plugins {
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    // Vanilla mode: `neoFormVersion` instead of `version`. This is the switch
+    // that gives us Minecraft-without-a-loader.
+    neoFormVersion = neoform_version
+
+    // Access Transformers widen the visibility of Minecraft members that Mojang
+    // made private. Declaring them here (rather than in each loader subproject)
+    // keeps a single list. The loader subprojects re-publish this same file.
+    //
+    // The file starts out empty except for comments — add entries only when you
+    // actually need them, and prefer an Accessor mixin when you need just one
+    // field, since ATs are global and can collide with other mods.
+    accessTransformers {
+        validateAccessTransformers = true
+        from project.file('src/main/resources/META-INF/accesstransformer.cfg')
+        publish project.file('src/main/resources/META-INF/accesstransformer.cfg')
+    }
+}
+
+dependencies {
+    // Mixin and the annotation processor are needed at *compile* time so that
+    // common can declare mixins. At runtime the loader supplies its own copy,
+    // hence compileOnly rather than implementation.
+    compileOnly "org.spongepowered:mixin:0.8.7"
+
+    // JetBrains annotations (@Nullable, @NotNull) are used throughout the
+    // example code. They are compile-time only and are not shipped in the jar.
+    compileOnly "org.jetbrains:annotations:26.0.2"
+
+    testImplementation platform("org.junit:junit-bom:5.14.1")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+}
+
+// The common jar is a build input for fabric/ and neoforge/, never something a
+// user installs. Publishing it to Modrinth would just confuse people, so it is
+// excluded from the release workflow by name.

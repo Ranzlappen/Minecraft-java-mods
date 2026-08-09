@@ -1,0 +1,36 @@
+name: Minecraft version port
+description: Request support for a new Minecraft version.
+labels: ["port", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A port is not a version bump — Minecraft breaks internal APIs on every
+        release. The process is documented in
+        [docs/05-upgrading-minecraft-versions.md](https://github.com/Ranzlappen/Minecraft-java-mods/blob/main/docs/05-upgrading-minecraft-versions.md)
+        if you would like to open a PR yourself.
+
+  - type: input
+    id: target
+    attributes:
+      label: Target Minecraft version
+      placeholder: "26.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Loader
+      multiple: true
+      options: [Fabric, NeoForge]
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now?
+      description: |
+        e.g. "our server is upgrading next month", or "this is the version the
+        pack we use has moved to".

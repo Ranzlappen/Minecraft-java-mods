@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/Ranzlappen/Minecraft-java-mods/discussions
+    about: Open-ended questions and show-and-tell belong in Discussions.
+  - name: Modding help (not this mod)
+    url: https://discord.neoforged.net/
+    about: General Minecraft modding questions are better answered on the loader Discords.
+  - name: Documentation
+    url: https://github.com/Ranzlappen/Minecraft-java-mods/tree/main/docs
+    about: Start here — sides, upgrading, building, publishing.

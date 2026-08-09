@@ -1,0 +1,109 @@
+# Security scanning: CodeQL, secret detection, and OpenSSF Scorecard.
+#
+# Runs on pushes to main, on pull requests, and weekly so that newly-published
+# advisories are caught on code that has not changed.
+
+name: Security scan
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: '23 4 * * 2'   # Tuesdays, 04:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: Resolve Java version from gradle.properties
+        id: java
+        run: echo "version=$(grep -E '^java_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Setup JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654  # v5
+        with:
+          distribution: 'temurin'
+          java-version: ${{ steps.java.outputs.version }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d  # v4
+        with:
+          cache-read-only: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e  # v4.35.4
+        with:
+          languages: java-kotlin
+          build-mode: manual
+
+      # Only the mod's own code needs compiling for analysis; skipping tests and
+      # javadoc keeps this well inside the timeout.
+      - name: Build for analysis
+        run: ./gradlew classes --stacktrace
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e  # v4.35.4
+        with:
+          category: '/language:java-kotlin'
+
+  gitleaks:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        with:
+          fetch-depth: 0   # gitleaks scans history, not just the tip
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  scorecard:
+    name: OpenSSF Scorecard
+    # Only meaningful on the default branch of a public repo.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload results to the Security tab
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e  # v4.35.4
+        with:
+          sarif_file: results.sarif

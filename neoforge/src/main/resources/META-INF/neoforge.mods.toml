@@ -1,0 +1,67 @@
+# =============================================================================
+# neoforge.mods.toml — NeoForge's mod metadata.
+#
+# Every ${...} below is substituted from gradle.properties at build time by the
+# `processResources` block in the root build.gradle. Do not hard-code versions
+# here; change gradle.properties instead.
+# =============================================================================
+
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "${mod_license}"
+issueTrackerURL = "${mod_issues}"
+
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_name}"
+description = '''${mod_description}'''
+authors = "${mod_author}"
+displayURL = "${mod_homepage}"
+# Same file the Fabric jar uses — it lives in common/src/main/resources and is
+# copied into both jars, so there is only one icon to replace.
+logoFile = "assets/${mod_id}/icon.png"
+
+# NOTE: there is no `side` or `displayTest` field here any more. Older Forge and
+# early NeoForge used `displayTest` to tell the server "do not red-X clients
+# that lack this mod". Modern NeoForge decides that from your *network* usage
+# instead: a mod that registers no payloads, or registers them via
+# `PayloadRegistrar#optional()`, does not block a vanilla client from
+# connecting. See docs/02-sides-client-vs-server.md#neoforge-connection-matching
+
+
+# --- Dependencies ------------------------------------------------------------
+# `ordering` controls load order relative to the dependency; `side` restricts
+# the requirement to one physical side. A dependency your mod only uses for
+# client rendering should be `side = "CLIENT"` so dedicated servers do not
+# demand it.
+
+[[dependencies.${mod_id}]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoforge_version},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+
+# --- Mixins ------------------------------------------------------------------
+# Points at the same config file the Fabric jar uses; the file itself lives in
+# common/src/main/resources and is shared by both loaders.
+
+[[mixins]]
+config = "${mod_id}.mixins.json"
+
+
+# --- Access Transformers -----------------------------------------------------
+# Also shared with the Fabric build. Empty by default.
+
+[[accessTransformers]]
+file = "META-INF/accesstransformer.cfg"

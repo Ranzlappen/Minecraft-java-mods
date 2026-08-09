@@ -1,0 +1,173 @@
+# Build and publish a release.
+#
+# Triggered by pushing a `v*` tag. Pushing the commit alone does nothing:
+#
+#   git push origin main --follow-tags
+#
+# The tag suffix picks the release channel:
+#   v1.2.3            -> stable
+#   v1.2.3-beta.1     -> beta, and marked as a prerelease on GitHub
+#   v1.2.3-alpha.1    -> alpha
+#   v1.2.3-rc.1       -> beta channel, prerelease on GitHub
+#
+# Modrinth and CurseForge steps are skipped automatically when modrinth_id /
+# curseforge_id are blank in gradle.properties, so this works out of the box on
+# a fresh clone.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)release, e.g. v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write   # create the GitHub Release and upload jars
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          RAW_TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${RAW_TAG#v}"
+
+          case "$RAW_TAG" in
+            *-alpha*) CHANNEL=alpha; PRERELEASE=true ;;
+            *-beta*)  CHANNEL=beta;  PRERELEASE=true ;;
+            *-rc*)    CHANNEL=beta;  PRERELEASE=true ;;
+            *)        CHANNEL=stable; PRERELEASE=false ;;
+          esac
+
+          {
+            echo "tag=$RAW_TAG"
+            echo "version=$VERSION"
+            echo "channel=$CHANNEL"
+            echo "prerelease=$PRERELEASE"
+            echo "java=$(grep -E '^java_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Releasing $RAW_TAG (version $VERSION, channel $CHANNEL)"
+
+      # The tag must agree with gradle.properties, or the jars are named after a
+      # different version than the release they are attached to.
+      - name: Verify the tag matches mod_version
+        run: |
+          MOD_VERSION="$(grep -E '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+          if [ "$MOD_VERSION" != "${{ steps.meta.outputs.version }}" ]; then
+            echo "::error::Tag says ${{ steps.meta.outputs.version }} but gradle.properties says $MOD_VERSION."
+            echo "Bump gradle.properties and re-tag, or use the version-bump workflow which does both."
+            exit 1
+          fi
+          echo "OK: tag and mod_version agree ($MOD_VERSION)"
+
+      - name: Setup JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654  # v5
+        with:
+          distribution: 'temurin'
+          java-version: ${{ steps.meta.outputs.java }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d  # v4
+        with:
+          cache-read-only: true
+
+      - name: Validate metadata
+        run: python3 scripts/validate-metadata.py
+
+      - name: Build
+        run: ./gradlew build --stacktrace
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          {
+            echo 'body<<CHANGELOG_EOF'
+            python3 scripts/release-tools.py extract-changelog "${{ steps.meta.outputs.version }}"
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Stage exactly the jars users should download. Doing the filtering here
+      # rather than with negated globs in the release action keeps it obvious
+      # what ships, and fails loudly if a loader produced nothing.
+      #
+      # -dev, -sources and -javadoc jars are build outputs, not deliverables;
+      # attaching a -dev jar to a release reliably produces bug reports from
+      # people who installed the wrong file.
+      - name: Stage release artifacts
+        run: |
+          mkdir -p release-artifacts
+          for loader in fabric neoforge; do
+            found=0
+            for jar in "$loader"/build/libs/*.jar; do
+              [ -e "$jar" ] || continue
+              case "$jar" in
+                *-dev.jar|*-sources.jar|*-javadoc.jar) continue ;;
+              esac
+              cp "$jar" release-artifacts/
+              found=1
+            done
+            if [ "$found" -eq 0 ]; then
+              echo "::error::No distributable jar produced for $loader."
+              ls -la "$loader/build/libs/" || true
+              exit 1
+            fi
+          done
+          echo "Staged for release:"
+          ls -1 release-artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body: ${{ steps.changelog.outputs.body }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          fail_on_unmatched_files: true
+          files: release-artifacts/*.jar
+
+      # Skipped automatically when both project IDs are blank — the plugin's
+      # publish tasks are only created for configured platforms.
+      - name: Publish to Modrinth and CurseForge
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CHANGELOG_BODY: ${{ steps.changelog.outputs.body }}
+          RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
+        run: |
+          MODRINTH_ID="$(grep -E '^modrinth_id=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+          CURSEFORGE_ID="$(grep -E '^curseforge_id=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+
+          if [ -z "$MODRINTH_ID" ] && [ -z "$CURSEFORGE_ID" ]; then
+            echo "Neither modrinth_id nor curseforge_id is set in gradle.properties — skipping."
+            echo "See docs/09-publishing.md to set them up."
+            exit 0
+          fi
+
+          if [ -n "$MODRINTH_ID" ] && [ -z "$MODRINTH_TOKEN" ]; then
+            echo "::error::modrinth_id is set but the MODRINTH_TOKEN secret is missing."
+            exit 1
+          fi
+          if [ -n "$CURSEFORGE_ID" ] && [ -z "$CURSEFORGE_TOKEN" ]; then
+            echo "::error::curseforge_id is set but the CURSEFORGE_TOKEN secret is missing."
+            exit 1
+          fi
+
+          ./gradlew publishMods --stacktrace

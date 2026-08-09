@@ -1,0 +1,141 @@
+# Repository hygiene checks that are not about the mod code itself.
+#
+#   actionlint       workflow YAML is valid and the shell in `run:` blocks is sane
+#   shellcheck       scripts/*.sh are correct
+#   scripts          the Python helpers work, and the rename self-test passes
+#   links            no dead links in the docs
+#   pinning          every `uses:` is pinned to a full commit SHA
+#
+# The SHA-pinning check is the security-relevant one: a mutable tag like
+# `@v4` can be repointed by whoever owns the action.
+
+name: Repo sanitation
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main", "mc/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sanitation-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: actionlint
+        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8  # v2
+        with:
+          fail-on-error: true
+
+  action-pinning:
+    name: Actions pinned to SHAs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: Every `uses:` must be a 40-character SHA
+        run: |
+          # Local (./...) and reusable-workflow references are exempt.
+          BAD="$(grep -rnE '^\s*uses:\s*[^./]' .github/workflows/ \
+                 | grep -vE 'uses:\s*\S+@[0-9a-f]{40}' || true)"
+          if [ -n "$BAD" ]; then
+            echo "::error::These actions are not pinned to a full commit SHA:"
+            echo "$BAD"
+            exit 1
+          fi
+          echo "OK: all actions pinned to SHAs"
+
+      - name: Every pinned SHA carries a version comment
+        run: |
+          # The comment is what makes the pin reviewable — a bare SHA tells a
+          # reviewer nothing about which version they are approving.
+          BAD="$(grep -rnE 'uses:\s*\S+@[0-9a-f]{40}' .github/workflows/ \
+                 | grep -vE '#\s*v?[0-9]' || true)"
+          if [ -n "$BAD" ]; then
+            echo "::error::These pinned actions have no trailing version comment:"
+            echo "$BAD"
+            exit 1
+          fi
+          echo "OK: all pins annotated"
+
+  shellcheck:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=warning scripts/*.sh
+
+  scripts:
+    name: Helper scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: Metadata validator
+        run: python3 scripts/validate-metadata.py
+
+      - name: Side-safety checker
+        run: python3 scripts/check-side-safety.py
+
+      - name: Release tooling
+        run: |
+          python3 scripts/release-tools.py next-version patch > /dev/null
+          python3 scripts/release-tools.py next-version minor > /dev/null
+          python3 scripts/release-tools.py next-version major > /dev/null
+          CURRENT="$(grep -E '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
+          python3 scripts/release-tools.py extract-changelog "$CURRENT" > /dev/null
+          echo "OK"
+
+      # The rename script touches files no compiler checks — services file
+      # names and contents, the mixin config name. Its self-test is the only
+      # thing standing between a rename and a runtime ServiceConfigurationError.
+      - name: Rename self-test
+        run: ./scripts/selftest-rename.sh
+
+  links:
+    name: Documentation links
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      # Cross-references between the docs, including #anchor fragments. lychee
+      # does not verify that an anchor points at a heading that still exists,
+      # and renamed headings are the usual way doc links rot.
+      - name: Internal links and anchors
+        run: python3 scripts/check-doc-links.py
+
+      - name: lychee
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411  # v2
+        with:
+          args: >-
+            --no-progress
+            --max-concurrency 4
+            --accept 200,206,429
+            --exclude-path ./build
+            --exclude '^https://github\.com/Ranzlappen/Minecraft-java-mods'
+            './**/*.md'
+          fail: true
