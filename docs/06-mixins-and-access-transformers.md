@@ -231,7 +231,7 @@ Add them to the run configuration's JVM arguments.
 
 ## Further reading
 
-- [NeoForge — Mixins](https://docs.neoforged.net/docs/advanced/mixins/)
+- [NeoForge — Access Transformers](https://docs.neoforged.net/docs/advanced/accesstransformers/)
 - [Fabric — Mixin introduction](https://wiki.fabricmc.net/tutorial:mixin_introduction)
-- [The Mixin Javadoc](https://jenkins.liteloader.com/job/Mixin/javadoc/) — the
+- [The Mixin Javadoc](https://javadoc.io/doc/org.spongepowered/mixin) — the
   authoritative reference for every annotation
