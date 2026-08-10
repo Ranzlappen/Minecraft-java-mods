@@ -1,9 +1,11 @@
 # =============================================================================
 # neoforge.mods.toml — NeoForge's mod metadata.
 #
-# Every ${...} below is substituted from gradle.properties at build time by the
-# `processResources` block in the root build.gradle. Do not hard-code versions
-# here; change gradle.properties instead.
+# Every placeholder below is substituted from gradle.properties at build time
+# by the `processResources` block in the root build.gradle (which uses
+# Groovy's SimpleTemplateEngine, so a literal dollar-brace sequence anywhere
+# in this file — even in a comment — must be a valid Groovy expression).
+# Do not hard-code versions here; change gradle.properties instead.
 # =============================================================================
 
 modLoader = "javafml"
