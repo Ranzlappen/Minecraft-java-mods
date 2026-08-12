@@ -66,13 +66,13 @@ library, which is why mixins live in `common/`.
 
 ### The pieces
 
-**The config** — `common/src/main/resources/examplemod.mixins.json`:
+**The config** — `common/src/main/resources/statusoverlay.mixins.json`:
 
 ```json
 {
   "required": true,
   "minVersion": "0.8.7",
-  "package": "com.example.examplemod.mixin",
+  "package": "com.statusoverlay.mod.mixin",
   "mixins": ["MinecraftServerMixin"],
   "client": [],
   "server": [],
@@ -91,12 +91,12 @@ to `package`.
 
 ```jsonc
 // fabric.mod.json
-"mixins": ["examplemod.mixins.json"]
+"mixins": ["statusoverlay.mixins.json"]
 ```
 ```toml
 # neoforge.mods.toml
 [[mixins]]
-config = "examplemod.mixins.json"
+config = "statusoverlay.mixins.json"
 ```
 
 > **No `refmap` since 26.1.** Refmaps translated dev-time names to obfuscated
@@ -140,7 +140,7 @@ call), `FIELD` (at a field access).
 Prefix injected methods with your mod id:
 
 ```java
-private void examplemod$onServerConstructed(CallbackInfo ci) { }
+private void statusoverlay$onServerConstructed(CallbackInfo ci) { }
 ```
 
 Mixin merges your methods into the target class. Two mods that both add
@@ -200,7 +200,7 @@ Open the decompiled class in your IDE (Ctrl-click the target) and find the new
 name.
 
 ```
-Mixin apply failed examplemod.mixins.json:MinecraftServerMixin -> ...
+Mixin apply failed statusoverlay.mixins.json:MinecraftServerMixin -> ...
 ```
 
 Means: the mixin applied but produced invalid bytecode. Usually a wrong

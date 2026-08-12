@@ -37,8 +37,8 @@ Which shape does this mod have after the change?
 - [ ] `./gradlew :neoforge:runServer` starts and stays up
 - [ ] Tested in game (say how, below)
 
-<!-- What did you actually do in game? "Ran /playtime, relogged, checked it
-     persisted" is useful. "Tested it" is not. -->
+<!-- What did you actually do in game? "Mounted a horse, watched the speed
+     overlay update while riding" is useful. "Tested it" is not. -->
 
 ## Compatibility
 

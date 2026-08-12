@@ -14,15 +14,13 @@ one puts you ahead.
 Tests live in `common/src/test/java/`. They run in milliseconds because nothing
 Minecraft-related loads.
 
-This is why `PlaytimeTracker` has no Minecraft imports. It is deliberate: game
+This is why `OverlayFormat` has no Minecraft imports. It is deliberate: game
 logic expressed in plain Java is logic you can test.
 
 ```java
 @Test
-void clockGoingBackwardsDoesNotProduceNegativeTime() {
-    PlaytimeTracker tracker = new PlaytimeTracker();
-    tracker.onJoin(PLAYER, 10_000L);
-    assertEquals(Duration.ZERO, tracker.totalFor(PLAYER, 5_000L));
+void blocksPerSecondScalesByTicksPerSecond() {
+    assertEquals(4.3, OverlayFormat.blocksPerSecond(0.215), 1e-9);
 }
 ```
 

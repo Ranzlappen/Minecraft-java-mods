@@ -21,8 +21,8 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Start a dedicated server with only this mod
-        2. Join and run /playtime
+        1. Launch a client with only this mod
+        2. Join a world and mount a horse
         3. ...
     validations:
       required: true
@@ -31,7 +31,7 @@ body:
     id: mod-version
     attributes:
       label: Mod version
-      description: The full filename, e.g. examplemod-fabric-0.1.0+mc26.2.jar
+      description: The full filename, e.g. statusoverlay-fabric-0.1.0+mc26.2.jar
     validations:
       required: true
 

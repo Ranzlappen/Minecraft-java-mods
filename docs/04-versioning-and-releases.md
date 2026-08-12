@@ -24,7 +24,7 @@ when the wrong one is installed.
 | Bump | When | Example |
 | --- | --- | --- |
 | **Major** (`1.0.0`) | Breaking change for dependants or for existing worlds: registry names removed, config keys renamed, API removed, save data incompatible | Renamed a block; old worlds lose it |
-| **Minor** (`0.5.0`) | New features, new Minecraft version support, new config options with defaults | Added `/playtime reset`; ported to 26.3 |
+| **Minor** (`0.5.0`) | New features, new Minecraft version support, new config options with defaults | Added the horse-speed overlay; ported to 26.3 |
 | **Patch** (`0.4.1`) | Bug fixes, performance, docs, dependency bumps with no behaviour change | Fixed a crash on empty config |
 
 **A new Minecraft version is at least a minor bump**, even when your code did not
@@ -40,8 +40,8 @@ else. Go 1.0.0 when other people depend on you.
 Commit messages drive changelog generation and the automatic bump.
 
 ```
-feat(command): add /playtime reset for admins
-fix(config): survive a malformed JSON file instead of crashing
+feat(fabric): add mounted horse speed overlay
+fix(neoforge): survive a null vehicle when reading horse speed
 docs(sides): explain optional payloads
 chore(deps): bump NeoForge to 26.2.0.57
 ```
@@ -113,16 +113,16 @@ gets a line under `## [Unreleased]` in the same PR that makes it.
 ## [Unreleased]
 
 ### Added
-- `/playtime reset` for admins.
+- Mounted-horse speed overlay.
 
 ### Fixed
-- Malformed config no longer crashes the server on startup.
+- The saturation overlay no longer renders while spectating.
 ```
 
 Sections: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
 
-Write for players, not for yourself. "Fixed a crash when joining with an empty
-inventory" beats "fixed NPE in `PlaytimeTracker#onJoin`".
+Write for players, not for yourself. "Fixed the saturation overlay showing in
+spectator mode" beats "fixed a missing isSpectator() check".
 
 ---
 

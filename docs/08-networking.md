@@ -3,6 +3,13 @@
 How to send data between server and client — and, more importantly, how to do it
 without forcing every player to install your mod.
 
+> The mod this template ships, Status Overlay, does not use any of this — both
+> HUD elements only read data the client already has, so there is no packet to
+> send. This page is a worked example for when you *do* need one: a
+> hypothetical `PlaytimePayload` that syncs a server-tracked value to the
+> client, the shape a Shape D (§6 in [02](./02-sides-client-vs-server.md))
+> feature usually takes.
+
 ---
 
 ## 1. First: do you actually need a packet?
@@ -50,11 +57,13 @@ you must do two things:
 ### Define the payload
 
 ```java
+// Identifier, not ResourceLocation -- Mojang renamed it as part of the 26.1
+// unobfuscation pass. See CLAUDE.md's "facts that are easy to get wrong".
 public record PlaytimePayload(long millis) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<PlaytimePayload> TYPE =
             new CustomPacketPayload.Type<>(
-                    ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, "playtime"));
+                    Identifier.fromNamespaceAndPath(Constants.MOD_ID, "playtime"));
 
     public static final StreamCodec<FriendlyByteBuf, PlaytimePayload> CODEC =
             StreamCodec.composite(

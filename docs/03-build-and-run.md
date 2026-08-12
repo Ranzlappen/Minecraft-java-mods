@@ -29,8 +29,8 @@ and decompiles it. Later builds take seconds. If it looks frozen at
 Output jars:
 
 ```
-fabric/build/libs/examplemod-fabric-0.1.0+mc26.2.jar
-neoforge/build/libs/examplemod-neoforge-0.1.0+mc26.2.jar
+fabric/build/libs/statusoverlay-fabric-0.1.0+mc26.2.jar
+neoforge/build/libs/statusoverlay-neoforge-0.1.0+mc26.2.jar
 ```
 
 Also produced: `-sources.jar` and `-javadoc.jar` (for other developers), and on

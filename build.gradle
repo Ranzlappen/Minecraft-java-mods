@@ -24,7 +24,7 @@ subprojects {
 
     // ---- Coordinates --------------------------------------------------------
     // Every jar is named <mod_id>-<loader>-<mod_version>+mc<minecraft_version>,
-    // e.g. examplemod-fabric-0.1.0+mc26.2.jar. Encoding the Minecraft version in
+    // e.g. statusoverlay-fabric-0.1.0+mc26.2.jar. Encoding the Minecraft version in
     // the filename is not cosmetic: users routinely have several versions of the
     // same mod in a downloads folder and the loader gives a very unhelpful error
     // when the wrong one is dropped into mods/.

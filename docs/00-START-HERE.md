@@ -23,8 +23,12 @@ cd my-mod
 You do **not** need Java 25 installed. Gradle downloads the right JDK itself
 (that is the `foojay-resolver` plugin in `settings.gradle`).
 
-Once in game: create a world, type `/playtime`. That reply came from
-`common/src/main/java/com/example/examplemod/command/PlaytimeCommand.java`.
+Once in game: create a world and look at the top-left corner of the HUD — a
+"Saturation: X.X" line is already there. Mount a horse and a "Speed: X.X
+blocks/s" line joins it. Both come from
+`fabric/src/client/java/com/statusoverlay/mod/fabric/client/StatusOverlayFabricClient.java`
+(the NeoForge equivalent lives at
+`neoforge/src/main/java/com/statusoverlay/mod/neoforge/client/StatusOverlayNeoForgeClient.java`).
 
 Now try the other loader and a dedicated server:
 
@@ -62,11 +66,11 @@ code go?"*
 
 | File | Runs when | Runs where |
 | --- | --- | --- |
-| `common/.../ExampleMod.java` → `init()` | Startup, once | Both sides, both loaders |
-| `fabric/.../ExampleModFabric.java` | Startup | Fabric, both sides |
-| `fabric/src/client/.../ExampleModFabricClient.java` | Startup | Fabric, client only |
-| `neoforge/.../ExampleModNeoForge.java` | Startup | NeoForge, both sides |
-| `neoforge/.../client/ExampleModNeoForgeClient.java` | Startup | NeoForge, client only |
+| `common/.../StatusOverlayMod.java` → `init()` | Startup, once | Both sides, both loaders |
+| `fabric/.../StatusOverlayFabric.java` | Startup | Fabric, both sides |
+| `fabric/src/client/.../StatusOverlayFabricClient.java` | Startup | Fabric, client only |
+| `neoforge/.../StatusOverlayNeoForge.java` | Startup | NeoForge, both sides |
+| `neoforge/.../client/StatusOverlayNeoForgeClient.java` | Startup | NeoForge, client only |
 
 **Default answer: write it in `common/`, call it from the loader entrypoints.**
 
@@ -74,14 +78,14 @@ code go?"*
 
 | Goal | Start in | Read |
 | --- | --- | --- |
-| Add a command | `common/.../command/` — copy `PlaytimeCommand` | [01](./01-architecture.md) |
+| Add a command | `common/.../command/` — a plain Brigadier tree, called from both loader entrypoints | [01](./01-architecture.md) |
 | React to a player joining / dying / breaking a block | The loader entrypoints; call into `common/` | [01](./01-architecture.md) |
-| Add a config option | `common/.../config/ExampleConfig.java` — add a field | — |
+| Add a config option | A plain Java class in `common/`, loaded by each loader's `IPlatformHelper#getConfigDirectory()` | — |
 | Add an item, block, or entity | `common/` registration + a loader hook | [01](./01-architecture.md) |
-| Change vanilla behaviour with no event for it | `common/.../mixin/` | [06](./06-mixins-and-access-transformers.md) |
+| Change vanilla behaviour with no event for it | `common/.../mixin/` — see `MinecraftServerMixin` for the pattern | [06](./06-mixins-and-access-transformers.md) |
 | Reach a private vanilla field | An `@Accessor` mixin, or an Access Transformer | [06](./06-mixins-and-access-transformers.md) |
 | Send data between server and client | Payload type in `common/`, handlers per side | [08](./08-networking.md) |
-| Draw something on screen | Client-only source set / class | [02](./02-sides-client-vs-server.md) |
+| Draw something on screen | Client-only source set / class — copy `StatusOverlayFabricClient` / `StatusOverlayNeoForgeClient` | [02](./02-sides-client-vs-server.md) |
 | Generate recipes, tags, loot tables | `neoforge/` datagen, `./gradlew :neoforge:runData` | [07](./07-testing.md) |
 | Write a test | `common/src/test/java/` | [07](./07-testing.md) |
 | Ship a release | Tag it; CI does the rest | [04](./04-versioning-and-releases.md), [09](./09-publishing.md) |
@@ -100,7 +104,13 @@ four answers and they are laid out in
 Short version for a *server* mod: keep everything on the server, talk to clients
 using vanilla packets (chat, titles, scoreboards, display entities, resource
 packs), and you get to support unmodded clients. That is dramatically less work
-than a matched-pair mod, and this template is set up for it.
+than a matched-pair mod.
+
+Short version for a *client* mod — like the Status Overlay HUD this template
+ships with: write nothing in `common/` beyond what genuinely has no Minecraft
+imports, put everything in the client entrypoints, and set
+`"environment": "client"` in `fabric.mod.json` so a dedicated server refuses to
+even load the jar rather than loading it and doing nothing.
 
 ---
 

@@ -138,11 +138,11 @@ NeoForge has one source set. The equivalent guarantee comes from splitting your
 
 ```java
 @Mod(Constants.MOD_ID)
-public class ExampleModNeoForge {           // loaded on both
+public class StatusOverlayNeoForge {           // loaded on both
 }
 
 @Mod(value = Constants.MOD_ID, dist = Dist.CLIENT)
-public class ExampleModNeoForgeClient {     // never loaded on a dedicated server
+public class StatusOverlayNeoForgeClient {     // never loaded on a dedicated server
 }
 ```
 
@@ -163,7 +163,7 @@ driven entirely by the server over the vanilla protocol:
 
 | Server-only feature | How the vanilla client sees it |
 | --- | --- |
-| Commands (`/playtime`) | Ordinary chat packets |
+| Commands (`/home`, `/tpa`) | Ordinary chat packets |
 | Chat messages, action bar, titles | Vanilla packets |
 | Teleports, gamemode, effects, damage | Vanilla state sync |
 | Loot tables, recipes, advancements | Sent as datapack sync on join |
@@ -171,8 +171,14 @@ driven entirely by the server over the vanilla protocol:
 | World generation, block changes | Vanilla chunk packets |
 | Custom item names / lore / components | Vanilla item sync |
 
-The example mod in this repo is exactly this shape. `/playtime` works for a
-player running an unmodded client, because the reply is a normal chat packet.
+The mod built from this template is **not** this shape — it is Shape B
+(§6), a client-side HUD mod with no server component at all. It is included
+here because the multiloader plumbing (`common/`, `IPlatformHelper`, both
+loaders' entrypoints) is worth keeping even for a client-only mod, and because
+it is the shape most readers will reach for if they add a command later:
+a `/command`-based feature like the one this table describes needs nothing on
+the client, so it stays Shape A or D. See §6 for how that changes your
+metadata.
 
 ### The line you cannot cross without a client install
 
@@ -224,14 +230,25 @@ systems, custom loot.
 Install: client `mods/` folder. The server needs nothing and usually does not
 know the mod exists.
 
-Examples: minimaps, HUD tweaks, performance mods, sound packs.
+Examples: minimaps, HUD tweaks, performance mods, sound packs — and the mod
+built from this template: a food-saturation and mounted-horse-speed HUD
+overlay. Both numbers are already known to the client (its own food data, the
+entity it is riding), so nothing has to come from the server at all.
 
 ```jsonc
 "environment": "client"
 ```
 
+This is what `fabric/src/main/resources/fabric.mod.json` actually ships. Fabric
+Loader enforces it: a dedicated server refuses to even load the jar, rather
+than loading it and having it silently do nothing.
+
 On NeoForge, keep everything under `@Mod(dist = Dist.CLIENT)` and register no
-required payloads, so servers do not reject the client.
+required payloads, so servers do not reject the client. NeoForge has no
+`"environment"`-style field to refuse loading a plain, non-`dist`-scoped
+`@Mod` class outright — see `StatusOverlayNeoForge`'s Javadoc for how this
+template handles that asymmetry (it loads on both sides and logs that it has
+nothing to do on a server, instead of Fabric's hard refusal).
 
 ### Shape C — Both required (matched pair)
 
@@ -319,8 +336,8 @@ client-only mixin from being applied on a server:
 
 ```jsonc
 "mixins": [
-  "examplemod.mixins.json",
-  { "config": "examplemod.client.mixins.json", "environment": "client" }
+  "statusoverlay.mixins.json",
+  { "config": "statusoverlay.client.mixins.json", "environment": "client" }
 ]
 ```
 

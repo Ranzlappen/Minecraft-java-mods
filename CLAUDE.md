@@ -95,7 +95,7 @@ entry if the class is new. Keep that interface small.
   match their density and tone. Do not add comments that restate the code.
 - **Conventional Commits**, scopes: `command`, `config`, `network`, `mixin`,
   `fabric`, `neoforge`, `common`, `build`, `ci`, `docs`, `deps`.
-- **Mixin methods are prefixed** with the mod id: `examplemod$onTick`.
+- **Mixin methods are prefixed** with the mod id: `statusoverlay$onTick`.
 - Four-space indent, 120-column soft limit, UTF-8, LF.
 - Every user-visible change gets a `CHANGELOG.md` entry under `## [Unreleased]`
   in the same commit.
@@ -116,6 +116,8 @@ that will be confidently wrong about these:
 | **Java** | 25 for 26.1+. 21 for 1.20.5–1.21.11. |
 | **`displayTest`** | **Gone** from `neoforge.mods.toml`. Connection matching is derived from payload registration; use `PayloadRegistrar#optional()` for a mod vanilla clients should still be able to join with. |
 | **NeoForge versions** | Mirror Minecraft: `26.2.0.57` for Minecraft 26.2. |
+| **`ResourceLocation`** | **Renamed to `Identifier`** as part of the 26.1 unobfuscation pass (same package, `net.minecraft.resources`). `ResourceLocationException`, `ResourceLocationArgument`, and similar sibling classes were renamed the same way. Training data will confidently write `ResourceLocation.fromNamespaceAndPath(...)` — that class no longer exists. |
+| **Entity packages** | `net.minecraft.world.entity.animal.horse.*` moved to `.animal.equine.*` in the same pass (`AbstractHorse`, `Horse`, `Llama`, ...). Several other entity/model packages were similarly reorganised into subpackages — check before assuming an old import path still resolves. |
 
 Do not "correct" these back to the pre-2026 forms. If unsure, check
 `scripts/check-toolchain-updates.py` output or the upstream sources listed in

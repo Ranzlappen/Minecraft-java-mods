@@ -77,11 +77,11 @@ Each loader implements it, and registers the implementation through a plain JDK
 `ServiceLoader` file:
 
 ```
-fabric/src/main/resources/META-INF/services/com.example.examplemod.platform.IPlatformHelper
-  -> com.example.examplemod.fabric.FabricPlatformHelper
+fabric/src/main/resources/META-INF/services/com.statusoverlay.mod.platform.IPlatformHelper
+  -> com.statusoverlay.mod.fabric.FabricPlatformHelper
 
-neoforge/src/main/resources/META-INF/services/com.example.examplemod.platform.IPlatformHelper
-  -> com.example.examplemod.neoforge.NeoForgePlatformHelper
+neoforge/src/main/resources/META-INF/services/com.statusoverlay.mod.platform.IPlatformHelper
+  -> com.statusoverlay.mod.neoforge.NeoForgePlatformHelper
 ```
 
 Common calls it through `Services.PLATFORM`.
@@ -128,8 +128,16 @@ on the wrong bus.
 | Fires | Once, during startup | Continuously, during play |
 | Example events | `RegisterEvent`, `FMLCommonSetupEvent`, `RegisterPayloadHandlersEvent` | `RegisterCommandsEvent`, `PlayerEvent.*`, `ServerTickEvent` |
 
-In this repo: `ExampleModNeoForge`'s constructor takes the mod bus, and the
-nested `GameEvents` class carries `@EventBusSubscriber` for the game bus.
+In this repo: `StatusOverlayNeoForgeClient`'s constructor takes the mod bus and
+calls `modBus.addListener(...)` directly for `RegisterGuiLayersEvent` — a
+client-only *setup* event (build the HUD once at startup), which is why it
+belongs on the mod bus rather than the game bus. Status Overlay has no
+gameplay events (no ticks, no commands, no player join/leave), so there is
+currently no live example of the game-bus half in this repo; if you add one,
+use `@EventBusSubscriber(modid = Constants.MOD_ID)` on a nested class the way
+the old `/playtime` example mod used to (see the git history if you want the
+worked example back) — its default bus is the game bus, which is the opposite
+default from the constructor-injected `modBus`.
 
 Fabric has no equivalent split — every event is a callback object you register
 on directly, which is simpler but gives you less structure.
@@ -138,21 +146,22 @@ on directly, which is simpler but gives you less structure.
 
 ## 4. Where state lives
 
-`ExampleMod.playtime()` is a static singleton holding server-side state. That is
-correct here because there is exactly one logical server per process.
-
-Scaling up:
+Status Overlay itself holds no state at all — both HUD elements read live data
+(`Player#getFoodData()`, the ridden entity's `getDeltaMovement()`) fresh every
+frame and keep nothing between calls. That is deliberate: a HUD overlay with
+no persistence needs is simpler than one that caches, and there is nothing to
+get out of sync. If your mod needs actual state, here is where it goes:
 
 | Need | Use |
 | --- | --- |
-| Per-process, transient | A static field, as here |
+| Per-process, transient | A static field |
 | Per-world, must survive restarts | `SavedData` attached to the overworld |
 | Per-player, must survive restarts | `SavedData` keyed by UUID, or player NBT / attachments |
 | Per-entity or per-block | Data attachments (NeoForge) / component API (Fabric) |
 
 Anything that must persist should **not** be a static field. Static state also
-leaks between singleplayer worlds in the same session unless you clear it —
-which is why this repo resets the tracker on `SERVER_STOPPED`.
+leaks between singleplayer worlds in the same session unless you explicitly
+clear it on world unload / server stop.
 
 ---
 
@@ -177,7 +186,7 @@ The shape generalises. For a new loader (Quilt, or a future one):
 1. Create `quilt/` with its own `build.gradle`.
 2. Add the common source dirs to its source set.
 3. Implement `IPlatformHelper` and add the `META-INF/services` file.
-4. Write the entrypoint; call `ExampleMod.init()`.
+4. Write the entrypoint; call `StatusOverlayMod.init()`.
 5. `include 'quilt'` in `settings.gradle`.
 6. Add a CI job and a `publishMods` block.
 

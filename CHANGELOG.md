@@ -7,13 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 with the Minecraft version appended as build metadata (`0.1.0+mc26.2`).
 
 Write entries for players, not for yourself: "fixed a crash when joining with a
-full inventory" beats "fixed NPE in PlaytimeTracker".
+full inventory" beats "fixed a null pointer in the config loader".
 
 ## [Unreleased]
 
 ### Added
 
+- Food saturation HUD overlay, always visible outside spectator mode.
+- Mounted-horse speed HUD overlay (blocks/second), visible while riding a
+  horse, donkey, mule, or llama.
+
 ### Changed
+
+- Renamed the template's example mod to **Status Overlay** and re-shaped it
+  from a server-side `/playtime` command (Shape A/D) to a client-only HUD mod
+  (Shape B) — see `docs/02-sides-client-vs-server.md#6-the-four-installation-shapes`.
+  `fabric.mod.json` now declares `"environment": "client"` accordingly.
+
+### Removed
+
+- The `/playtime` command, its JSON config, and the unit-tested
+  `PlaytimeTracker` — replaced by the overlays above.
 
 ### Fixed
 

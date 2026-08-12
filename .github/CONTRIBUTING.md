@@ -40,7 +40,7 @@ First build takes 5–20 minutes.
 - Match the surrounding code. Four-space indent, 120-column soft limit.
 - Comments should explain *why*, not restate the code. The existing comments are
   the standard to aim at.
-- Prefix mixin methods with the mod id: `examplemod$onTick`.
+- Prefix mixin methods with the mod id: `statusoverlay$onTick`.
 - Conventional Commits for commit messages —
   [docs/04-versioning-and-releases.md](../docs/04-versioning-and-releases.md#2-conventional-commits).
 

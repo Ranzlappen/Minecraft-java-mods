@@ -4,7 +4,7 @@
 The metadata files (fabric.mod.json, neoforge.mods.toml) contain ${...}
 placeholders that Gradle substitutes from gradle.properties at build time. This
 script does the same substitution and then parses the result, which catches
-four classes of mistake without running Gradle at all:
+five classes of mistake without running Gradle at all:
 
   1. A placeholder that has no matching property (typo, or a property renamed
      in gradle.properties but not in the template).
@@ -20,6 +20,11 @@ four classes of mistake without running Gradle at all:
      itself) is invalid Groovy and fails the entire file's processResources
      step at build time, which this script's own substitution — being plain
      regex replacement, not a Groovy parse — does not otherwise catch.
+  5. A fabric.mod.json entrypoint that names a class with no matching .java
+     file on disk. Fabric Loader resolves entrypoints by reflection at
+     startup, not compile time, so a stale entry (e.g. left behind by a
+     hand-edit instead of ./scripts/rename-mod.sh) compiles cleanly and fails
+     with ClassNotFoundException the moment the mod loads.
 
 Run it directly, or let CI do it:  python3 scripts/validate-metadata.py
 """
@@ -187,6 +192,8 @@ def check_semantics(rel: str, parsed: object) -> list[str]:
         if env not in ("*", "client", "server"):
             problems.append(f"{rel}: 'environment' must be '*', 'client' or 'server', got {env!r}")
 
+        problems.extend(check_entrypoint_classes_exist(rel, parsed.get("entrypoints", {})))
+
     if rel.endswith("neoforge.mods.toml"):
         assert isinstance(parsed, dict)
         for mod_id, deps in parsed.get("dependencies", {}).items():
@@ -201,6 +208,47 @@ def check_semantics(rel: str, parsed: object) -> list[str]:
                         "NeoForge needs a Maven range (e.g. '[26.2,26.3)')."
                     )
 
+    return problems
+
+
+ENTRYPOINT_SOURCE_ROOTS = (
+    "fabric/src/main/java",
+    "fabric/src/client/java",
+    "common/src/main/java",
+)
+
+
+def check_entrypoint_classes_exist(rel: str, entrypoints: object) -> list[str]:
+    """Every fully-qualified class name in fabric.mod.json's 'entrypoints' must
+    exist on disk. Fabric Loader resolves these by reflection at startup, not at
+    compile time, so a renamed or moved class (e.g. by hand-editing after a
+    rename, rather than via rename-mod.sh, or by renaming a *.java file without
+    updating this JSON) fails as a runtime ClassNotFoundException with no
+    compiler to catch it first.
+    """
+    if not isinstance(entrypoints, dict):
+        return []
+
+    problems: list[str] = []
+    for entrypoint_type, entries in entrypoints.items():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            # Fabric's spec also allows {"adapter": ..., "value": ...} objects;
+            # only plain strings name a class directly.
+            class_name = entry if isinstance(entry, str) else entry.get("value") if isinstance(entry, dict) else None
+            if not class_name:
+                continue
+
+            relative_path = class_name.replace(".", "/") + ".java"
+            if not any((ROOT / root / relative_path).exists() for root in ENTRYPOINT_SOURCE_ROOTS):
+                problems.append(
+                    f"{rel}: entrypoints.{entrypoint_type} names {class_name!r}, but no "
+                    f"{relative_path} exists under {', '.join(ENTRYPOINT_SOURCE_ROOTS)}. "
+                    "Fabric Loader finds this class by reflection at startup, not at "
+                    "compile time -- a stale entry here compiles fine and fails with "
+                    "ClassNotFoundException the moment the mod loads."
+                )
     return problems
 
 

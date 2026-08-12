@@ -83,8 +83,8 @@ was renamed. That file is plain text and no refactoring tool updates it.
 
 Check both:
 ```
-fabric/src/main/resources/META-INF/services/com.example.examplemod.platform.IPlatformHelper
-neoforge/src/main/resources/META-INF/services/com.example.examplemod.platform.IPlatformHelper
+fabric/src/main/resources/META-INF/services/com.statusoverlay.mod.platform.IPlatformHelper
+neoforge/src/main/resources/META-INF/services/com.statusoverlay.mod.platform.IPlatformHelper
 ```
 
 The filename must be the **fully-qualified interface name**, and the contents the
@@ -92,7 +92,7 @@ fully-qualified implementation name.
 
 ### My mixin does nothing
 
-1. Is the class listed in `examplemod.mixins.json`?
+1. Is the class listed in `statusoverlay.mixins.json`?
 2. Is it in the right list (`mixins` / `client` / `server`)?
 3. Is `require = 0` hiding a failure? Remove it temporarily.
 4. Search the log:
@@ -123,8 +123,10 @@ You registered a required payload. Either register nothing, or use
 
 ### Config changes have no effect
 
-The config is read once at startup. Restart the server. If you need live reload,
-add a `/reload`-style command that calls `ExampleConfig.load()`.
+If your mod loads config once at startup (the usual pattern — see
+`docs/00-START-HERE.md`'s "Add a config option" row), restarting is required.
+For live reload, add a `/reload`-style command that calls your config class's
+`load()` again.
 
 ### Changes do not appear in game
 

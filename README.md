@@ -6,9 +6,13 @@
 [![Fabric + NeoForge](https://img.shields.io/badge/loaders-Fabric%20%2B%20NeoForge-blue)](./docs/01-architecture.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-A production-shaped starting point for **server-side Minecraft Java mods**,
-targeting **Minecraft 26.2** on both **Fabric** and **NeoForge** from one
-codebase — with the documentation, CI, and release automation already wired up.
+A production-shaped starting point for **Minecraft Java mods**, targeting
+**Minecraft 26.2** on both **Fabric** and **NeoForge** from one codebase —
+with the documentation, CI, and release automation already wired up. It ships
+with a real, working mod (**Status Overlay**, a client-side HUD) rather than a
+throwaway "hello world", so every mechanism in the template — the multiloader
+split, the platform abstraction, the CI smoke tests — is exercised by
+something that actually does something.
 
 > **New here? → [`docs/00-START-HERE.md`](./docs/00-START-HERE.md)**
 
@@ -32,8 +36,10 @@ You do **not** need a specific JDK installed — Gradle downloads the right one.
 The first build takes 5–20 minutes while Minecraft is fetched and decompiled;
 after that it is seconds.
 
-In game, type `/playtime`. That is the example mod responding — a working
-server-side feature that unmodded clients can use.
+In game, look at the top-left corner of the HUD — a "Saturation: X.X" line is
+already there. Mount a horse and a "Speed: X.X blocks/s" line joins it. Both
+are Status Overlay, the mod this template ships with, reading data the client
+already has and drawing it on screen — no server component required.
 
 ---
 
@@ -43,7 +49,7 @@ server-side feature that unmodded clients can use.
 | --- | --- |
 | **One codebase, two loaders** | `common/` holds the real logic and compiles against plain Minecraft. `fabric/` and `neoforge/` are thin adapters. Adding a third loader touches no shared code. |
 | **Side safety enforced by the build** | Loom's split source sets make "client code on a server" a *compile error* on Fabric, and CI greps for it everywhere else. This is the bug that breaks most first mods. |
-| **Working example** | `/playtime` command, JSON config, unit-tested tracker, a mixin, and access-transformer plumbing. Small, but every mechanism is present and wired. |
+| **Working example** | Status Overlay: a client-side food-saturation and mounted-horse-speed HUD, unit-tested formatting logic, a mixin, and access-transformer plumbing. Small, but every mechanism is present and wired. |
 | **CI that means something** | Compiling proves little for a mod. Every PR boots a real dedicated server on **both** loaders and fails if it does not reach the ready state or logs a mixin failure. |
 | **Release automation** | One click bumps the version, rewrites the changelog, tags, builds, publishes a GitHub Release, and uploads to Modrinth and CurseForge. |
 | **Keeps itself current** | A weekly job checks Minecraft, Fabric, and NeoForge upstream and opens a tracking issue when something newer exists — Dependabot cannot see these. |
@@ -78,8 +84,11 @@ early decides your metadata, your networking, and your support load:
 | **C** | required | **required, matching version** | Blocks, items, entities, machines |
 | **D** | required | optional, adds polish | A server mod with a nicer UI if you have it |
 
-**This template ships as Shape A/D** — everything runs on the server and
-unmodded clients get the full experience.
+**This template ships as Shape B** — Status Overlay is entirely client-side.
+Both HUD lines read data the client already has (its own food data, the
+entity it is riding), so the server needs nothing and does not even know the
+mod exists. See [`docs/02-sides-client-vs-server.md`](./docs/02-sides-client-vs-server.md#6-the-four-installation-shapes)
+for the other three shapes and how to build them from this same template.
 
 A lot of what looks like it needs a client mod does not: server resource packs,
 item components, display entities, bossbars and scoreboards cover a surprising
