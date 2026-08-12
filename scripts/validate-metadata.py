@@ -4,13 +4,22 @@
 The metadata files (fabric.mod.json, neoforge.mods.toml) contain ${...}
 placeholders that Gradle substitutes from gradle.properties at build time. This
 script does the same substitution and then parses the result, which catches
-three classes of mistake without running Gradle at all:
+four classes of mistake without running Gradle at all:
 
   1. A placeholder that has no matching property (typo, or a property renamed
      in gradle.properties but not in the template).
   2. A file that is not valid JSON/TOML after expansion.
   3. A version range written in the wrong grammar for its loader — Fabric and
      NeoForge use incompatible syntaxes and neither accepts the other's.
+  4. Any '${...}' or bare '$identifier' that is NOT a simple substitution
+     placeholder. Gradle's real `expand()` (used in the root build.gradle)
+     parses the whole file as a Groovy template via SimpleTemplateEngine, not
+     plain string substitution — it treats every '${...}' as a Groovy
+     expression to evaluate, *including inside comments*. A literal
+     '${...}' written as prose (e.g. explaining the templating mechanism
+     itself) is invalid Groovy and fails the entire file's processResources
+     step at build time, which this script's own substitution — being plain
+     regex replacement, not a Groovy parse — does not otherwise catch.
 
 Run it directly, or let CI do it:  python3 scripts/validate-metadata.py
 """
@@ -26,6 +35,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 PLACEHOLDER = re.compile(r"\$\{(\w+)\}")
+
+# Anything dollar-shaped that is NOT a well-formed '${word}' placeholder.
+# Gradle's Groovy-template expand() treats '$' specially everywhere in the
+# file, so any of these breaks the build even where plain regex substitution
+# above would have looked fine.
+MALFORMED_BRACE_PLACEHOLDER = re.compile(r"\$\{([^}]*)\}")
+BARE_DOLLAR = re.compile(r"\$(?!\{)")
 
 
 def targets(mod_id: str) -> list[tuple[str, str]]:
@@ -75,6 +91,11 @@ def main() -> int:
 
         raw = path.read_text(encoding="utf-8")
 
+        groovy_problems = check_groovy_template_safety(rel, raw)
+        if groovy_problems:
+            failures.extend(groovy_problems)
+            continue
+
         missing = sorted({m for m in PLACEHOLDER.findall(raw) if m not in props})
         if missing:
             failures.append(f"{rel}: no such property in gradle.properties: {missing}")
@@ -104,6 +125,47 @@ def main() -> int:
 
     print("\nAll metadata valid.")
     return 0
+
+
+def check_groovy_template_safety(rel: str, raw: str) -> list[str]:
+    """Anything dollar-shaped in `raw` must be a plain '${word}' placeholder.
+
+    Gradle's `expand()` (root build.gradle) parses this file with Groovy's
+    SimpleTemplateEngine, which evaluates every '${...}' as a live Groovy
+    expression -- including ones sitting inside a '#' or '//' comment, since
+    the engine has no concept of this file's own comment syntax. It also
+    treats a bare '$' (with no braces) as the start of a shorthand property
+    reference. Either one breaks the *entire* file's template compile, not
+    just the offending line, which is why this is checked before, and
+    separately from, the simple substitution below.
+    """
+    problems: list[str] = []
+
+    for match in MALFORMED_BRACE_PLACEHOLDER.finditer(raw):
+        inner = match.group(1)
+        if re.fullmatch(r"\w+", inner):
+            continue
+        line = raw.count("\n", 0, match.start()) + 1
+        problems.append(
+            f"{rel}:{line}: '${{{inner}}}' is not a plain identifier placeholder. "
+            "Gradle's expand() parses this whole file as a Groovy template, so "
+            "${...} must be valid Groovy wherever it appears -- including in a "
+            "comment describing the templating mechanism itself. Rephrase to avoid "
+            "a literal ${...} sequence."
+        )
+
+    # Only look at '$' outside of the well-formed placeholders already found above,
+    # so a valid '${mod_id}' does not also get flagged as a "bare dollar".
+    without_valid_placeholders = PLACEHOLDER.sub("", raw)
+    for match in BARE_DOLLAR.finditer(without_valid_placeholders):
+        line = without_valid_placeholders.count("\n", 0, match.start()) + 1
+        problems.append(
+            f"{rel}:~{line}: a bare '$' not part of a '${{word}}' placeholder. "
+            "Gradle's Groovy-template expand() treats this as live template syntax "
+            "and it will break processResources at build time."
+        )
+
+    return problems
 
 
 def check_semantics(rel: str, parsed: object) -> list[str]:

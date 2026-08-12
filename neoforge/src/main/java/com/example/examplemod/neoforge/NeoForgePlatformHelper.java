@@ -27,7 +27,9 @@ public final class NeoForgePlatformHelper implements IPlatformHelper {
 
     @Override
     public boolean isDevelopmentEnvironment() {
-        return !FMLEnvironment.production;
+        // FMLEnvironment.production was a public field in older NeoForge; it is
+        // an accessor method now.
+        return !FMLEnvironment.isProduction();
     }
 
     @Override

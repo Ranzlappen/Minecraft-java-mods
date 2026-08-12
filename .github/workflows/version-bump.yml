@@ -64,11 +64,15 @@ jobs:
         run: |
           CURRENT="$(grep -E '^mod_version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')"
           NEXT="$(python3 scripts/release-tools.py next-version '${{ inputs.bump }}')"
-          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
-          echo "next=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "### Version bump" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "\`$CURRENT\` → \`$NEXT\` (${{ inputs.bump }})" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "current=$CURRENT"
+            echo "next=$NEXT"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Version bump"
+            echo ""
+            echo "\`$CURRENT\` → \`$NEXT\` (${{ inputs.bump }})"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if the tag already exists
         run: |
@@ -116,8 +120,10 @@ jobs:
           git push origin "HEAD:${GITHUB_REF#refs/heads/}"
           git push origin "v${{ steps.version.outputs.next }}"
 
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Pushed \`v${{ steps.version.outputs.next }}\`. The Release workflow takes it from here." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ""
+            echo "Pushed \`v${{ steps.version.outputs.next }}\`. The Release workflow takes it from here."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Dry run notice
         if: ${{ inputs.dry_run }}

@@ -11,6 +11,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 
 /**
  * The {@code /playtime} command.
@@ -30,6 +32,17 @@ import net.minecraft.server.level.ServerPlayer;
  */
 public final class PlaytimeCommand {
 
+    /**
+     * There is no {@code CommandSourceStack#hasPermission(int)} any more.
+     * Vanilla replaced the old integer permission levels with a node-based
+     * system: {@code CommandSourceStack#permissions()} returns a
+     * {@code PermissionSet}, and you check it against a {@code Permission}
+     * instance rather than a bare number. {@code Permission.HasCommandLevel}
+     * is the node vanilla itself uses for the classic 0-4 levels, so wrapping
+     * a config-supplied level in one is the closest equivalent to the old
+     * call. {@code PermissionLevel} is the enum (ALL/MODERATORS/GAMEMASTERS/
+     * ADMINS/OWNERS); {@code byId} maps back from the old integer scale.
+     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("playtime")
@@ -39,8 +52,9 @@ public final class PlaytimeCommand {
                                 .requires(source -> ExampleConfig.get().allowQueryingOtherPlayers)
                                 .executes(PlaytimeCommand::other))
                         .then(Commands.literal("reset")
-                                .requires(source ->
-                                        source.hasPermission(ExampleConfig.get().adminPermissionLevel))
+                                .requires(source -> source.permissions().hasPermission(
+                                        new Permission.HasCommandLevel(
+                                                PermissionLevel.byId(ExampleConfig.get().adminPermissionLevel))))
                                 .executes(PlaytimeCommand::reset))
         );
         Constants.LOG.debug("Registered /playtime");
@@ -63,7 +77,9 @@ public final class PlaytimeCommand {
     /** {@code /playtime <player>} — someone else's time. */
     private static int other(CommandContext<CommandSourceStack> context) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         final ServerPlayer target = EntityArgument.getPlayer(context, "target");
-        return reply(context.getSource(), target, target.getGameProfile().getName() + " has played for ");
+        // GameProfile is a record as of the vanilla API modernisation — the
+        // accessor is name(), not getName().
+        return reply(context.getSource(), target, target.getGameProfile().name() + " has played for ");
     }
 
     /** {@code /playtime reset} — clears all tracked time. Admin only. */
