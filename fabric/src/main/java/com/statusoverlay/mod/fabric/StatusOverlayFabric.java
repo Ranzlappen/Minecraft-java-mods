@@ -14,9 +14,11 @@ import net.fabricmc.api.ModInitializer;
  * class from this file crashes a dedicated server with
  * {@code NoClassDefFoundError}. Client behaviour — which is where all of this
  * mod's actual features live — goes in
- * {@link com.statusoverlay.mod.fabric.client.StatusOverlayFabricClient} instead,
+ * {@code com.statusoverlay.mod.fabric.client.StatusOverlayFabricClient} instead,
  * which lives in the {@code src/client} source set and physically cannot be
- * loaded on a server.
+ * loaded on a server. {@code javadoc} cannot {@code @link} across that split
+ * (this class's compilation genuinely cannot see that one), which is why this
+ * is {@code @code} rather than {@code @link}.
  */
 public final class StatusOverlayFabric implements ModInitializer {
 
