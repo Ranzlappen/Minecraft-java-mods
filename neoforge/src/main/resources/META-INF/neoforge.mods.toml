@@ -23,7 +23,13 @@ authors = "${mod_author}"
 displayURL = "${mod_homepage}"
 # Same file the Fabric jar uses — it lives in common/src/main/resources and is
 # copied into both jars, so there is only one icon to replace.
-logoFile = "assets/${mod_id}/icon.png"
+#
+# iconFile, not logoFile: NeoForge 26.2's FancyModLoader deprecated logoFile at
+# runtime (confirmed by actually booting a 26.2 dedicated server — this is not
+# yet reflected in NeoForge's own MDK template as of this writing). iconFile is
+# for a square icon like this one; bannerFile is the separate, wider field for
+# a splash-style banner, which this template does not ship.
+iconFile = "assets/${mod_id}/icon.png"
 
 # NOTE: there is no `side` or `displayTest` field here any more. Older Forge and
 # early NeoForge used `displayTest` to tell the server "do not red-X clients
