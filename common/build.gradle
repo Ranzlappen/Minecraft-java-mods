@@ -47,7 +47,7 @@ dependencies {
 
     // JetBrains annotations (@Nullable, @NotNull) are used throughout the
     // example code. They are compile-time only and are not shipped in the jar.
-    compileOnly "org.jetbrains:annotations:26.0.2"
+    compileOnly "org.jetbrains:annotations:26.1.0"
 
     testImplementation platform("org.junit:junit-bom:5.14.1")
     testImplementation "org.junit.jupiter:junit-jupiter"
