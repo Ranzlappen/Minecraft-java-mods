@@ -15,7 +15,7 @@ plugins {
     // it here. The root project is not a mod, so it must not get modding plugins.
     id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
     id 'net.neoforged.moddev' version "${moddev_version}" apply false
-    id 'me.modmuss50.mod-publish-plugin' version '2.2.0' apply false
+    id 'me.modmuss50.mod-publish-plugin' version '2.2.1' apply false
 }
 
 subprojects {
